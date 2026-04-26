@@ -1,7 +1,7 @@
 # BrainAndCognitiveScienceHomework
 A repo for Brain And Cognitive Science which stores homework
 
-**two parts** 
+**TWO PARTS** 
 
-one is written by artificial intelligence
-the other written by person
+One is written by artificial intelligence
+The other is coded by human
