@@ -112,6 +112,7 @@ def main():
     plt.ylabel("Loss")
     plt.title("Training Loss Curve")
     plt.grid(True)
+    plt.xlim(-10,600)
     plt.tight_layout()
     plt.savefig(loss_image_path, dpi=300)
     plt.close()
