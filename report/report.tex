@@ -1,0 +1,305 @@
+\documentclass[UTF8,a4paper,12pt]{ctexart}
+
+\usepackage{geometry}
+\geometry{left=2.6cm,right=2.6cm,top=2.5cm,bottom=2.5cm}
+
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{fancyvrb}
+\usepackage{caption}
+\usepackage{hyperref}
+
+\pagestyle{plain}
+\pagenumbering{arabic}
+
+\title{\textbf{脑与认知科学大作业报告}\\神经网络实现编解码}
+
+\author{
+班级：\underline{\makebox[4cm][c]{人工智能2402班}}
+\quad
+学号：\underline{\makebox[4.5cm][c]{202431121013030}}
+\quad
+姓名：\underline{\makebox[3cm][c]{胡弈周}}
+}
+
+\date{}
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+本文基于 Python 语言手动实现了一个 $8$-$3$-$8$ 结构的自编码器神经网络，用于完成 $8 \times 8$ 单位矩阵的编解码任务。网络由输入层、隐藏层和输出层组成，其中输入层和输出层均包含 $8$ 个神经元，隐藏层包含 $3$ 个神经元。程序没有使用 TensorFlow、PyTorch 等深度学习框架，而是使用 NumPy 完成前向传播、误差反向传播和梯度下降参数更新，并使用 Matplotlib 绘制训练过程中的损失函数曲线。实验结果表明，经过训练后，网络能够将 $8 \times 8$ 单位矩阵压缩到 $8 \times 3$ 的隐藏层编码表示，并较好地恢复出原始单位矩阵。
+\end{abstract}
+
+\newpage
+
+\section{作业任务说明}
+
+本次作业要求实现一个 $8$-$3$-$8$ 的自编码器神经网络结构。网络输入为 $8 \times 8$ 单位矩阵，每一行为一个训练样本，也就是一个 one-hot 向量。网络需要通过隐藏层完成编码，再通过输出层完成解码，使输出结果尽可能接近原始输入。
+
+本实验程序使用 Python 编写，主要依赖 NumPy 和 Matplotlib。其中 NumPy 用于矩阵计算和手动实现梯度下降，Matplotlib 用于绘制损失函数图像。整个训练过程没有调用 TensorFlow、PyTorch 等深度学习框架，满足手动实现神经网络训练算法的要求。
+
+\section{网络结构设计}
+
+本实验采用三层全连接神经网络：
+
+\begin{itemize}
+    \item 输入层：$8$ 个神经元，对应 $8$ 维 one-hot 输入向量；
+    \item 隐藏层：$3$ 个神经元，用于学习输入数据的压缩编码；
+    \item 输出层：$8$ 个神经元，用于将隐藏层编码结果解码回 $8$ 维输出向量。
+\end{itemize}
+
+设输入矩阵为 $X \in \mathbb{R}^{8 \times 8}$，真实标签矩阵为 $Y \in \mathbb{R}^{8 \times 8}$。由于本任务是自编码任务，因此有：
+\begin{equation}
+    Y = X = I_8
+\end{equation}
+
+其中 $I_8$ 表示 $8 \times 8$ 单位矩阵。输入层到隐藏层的权重矩阵为 $W^{(1)} \in \mathbb{R}^{8 \times 3}$，偏置为 $b^{(1)} \in \mathbb{R}^{1 \times 3}$；隐藏层到输出层的权重矩阵为 $W^{(2)} \in \mathbb{R}^{3 \times 8}$，偏置为 $b^{(2)} \in \mathbb{R}^{1 \times 8}$。
+
+\section{激活函数}
+
+网络隐藏层和输出层均使用 Sigmoid 激活函数。Sigmoid 函数定义如下：
+\begin{equation}
+    \sigma(z)=\frac{1}{1+e^{-z}}
+\end{equation}
+
+其导数可以表示为：
+\begin{equation}
+    \sigma'(z)=\sigma(z)(1-\sigma(z))
+\end{equation}
+
+在程序实现中，为了防止指数计算时出现数值溢出，代码中使用了 \verb|np.clip(z, -60, 60)| 对输入值进行截断处理。
+
+\section{前向传播过程}
+
+前向传播过程分为输入层到隐藏层、隐藏层到输出层两个阶段。
+
+首先，输入矩阵 $X$ 经过第一层线性变换，得到隐藏层的预激活值：
+\begin{equation}
+    Z^{(1)} = XW^{(1)} + b^{(1)}
+\end{equation}
+
+然后通过 Sigmoid 激活函数得到隐藏层输出：
+\begin{equation}
+    H = \sigma(Z^{(1)})
+\end{equation}
+
+其中 $H \in \mathbb{R}^{8 \times 3}$，即每个输入样本被编码为 $3$ 维隐藏层表示。
+
+接着，隐藏层输出经过第二层线性变换，得到输出层预激活值：
+\begin{equation}
+    Z^{(2)} = HW^{(2)} + b^{(2)}
+\end{equation}
+
+最后通过 Sigmoid 激活函数得到网络预测输出：
+\begin{equation}
+    O = \sigma(Z^{(2)})
+\end{equation}
+
+其中 $O \in \mathbb{R}^{8 \times 8}$，表示网络解码后的输出矩阵。
+
+\section{损失函数}
+
+本实验采用均方误差作为损失函数。设训练样本数量为 $N$，输出维度为 $8$，则损失函数定义为：
+\begin{equation}
+    L = \frac{1}{2N}\sum_{n=1}^{N}\sum_{k=1}^{8}(O_{nk}-Y_{nk})^2
+\end{equation}
+
+程序中的实现为：
+\begin{equation}
+    L = 0.5 \times \operatorname{mean}\left(\sum (O-Y)^2\right)
+\end{equation}
+
+其中乘以 $0.5$ 是为了在反向传播求导时抵消平方项产生的系数 $2$，使梯度表达更加简洁。
+
+\section{反向传播算法}
+
+反向传播的目标是计算损失函数对各层权重和偏置的梯度，然后使用梯度下降法更新参数。
+
+\subsection{输出层误差项}
+
+输出层误差项为：
+\begin{equation}
+    \Delta^{(2)} = (O-Y) \odot O \odot (1-O)
+\end{equation}
+
+其中 $\odot$ 表示矩阵对应位置元素相乘。根据链式法则，输出层权重和偏置的梯度为：
+\begin{equation}
+    \frac{\partial L}{\partial W^{(2)}} =
+    \frac{H^T\Delta^{(2)}}{N}
+\end{equation}
+
+\begin{equation}
+    \frac{\partial L}{\partial b^{(2)}} =
+    \operatorname{mean}(\Delta^{(2)})
+\end{equation}
+
+\subsection{隐藏层误差项}
+
+隐藏层误差需要由输出层误差反向传播得到：
+\begin{equation}
+    \Delta^{(1)} =
+    \left(\Delta^{(2)}(W^{(2)})^T\right)
+    \odot H \odot (1-H)
+\end{equation}
+
+因此，输入层到隐藏层权重和偏置的梯度为：
+\begin{equation}
+    \frac{\partial L}{\partial W^{(1)}} =
+    \frac{X^T\Delta^{(1)}}{N}
+\end{equation}
+
+\begin{equation}
+    \frac{\partial L}{\partial b^{(1)}} =
+    \operatorname{mean}(\Delta^{(1)})
+\end{equation}
+
+\section{梯度下降参数更新}
+
+设学习率为 $\eta$，则参数更新公式如下：
+\begin{equation}
+    W^{(2)} \leftarrow W^{(2)} - \eta \frac{\partial L}{\partial W^{(2)}}
+\end{equation}
+
+\begin{equation}
+    b^{(2)} \leftarrow b^{(2)} - \eta \frac{\partial L}{\partial b^{(2)}}
+\end{equation}
+
+\begin{equation}
+    W^{(1)} \leftarrow W^{(1)} - \eta \frac{\partial L}{\partial W^{(1)}}
+\end{equation}
+
+\begin{equation}
+    b^{(1)} \leftarrow b^{(1)} - \eta \frac{\partial L}{\partial b^{(1)}}
+\end{equation}
+
+本实验在每个 epoch 中对完整的 $8$ 个样本进行一次批量梯度下降更新。
+
+\section{程序实现说明}
+
+本实验代码主要包括四个逻辑部分：参数配置、数学工具函数、自编码器模型类和主程序训练流程。虽然最终提交代码可以保存在一个 \verb|brain_cognitive_autoencoder.py| 文件中，但从结构上可以理解为以下四个部分：
+
+\begin{table}[H]
+    \centering
+    \caption{程序逻辑模块划分}
+    \begin{tabular}{lll}
+        \toprule
+        模块 & 对应内容 & 主要功能 \\
+        \midrule
+        \verb|config.py| & 参数配置部分 & 设置输入维度、隐藏层维度、训练轮数、学习率等 \\
+        \verb|math_utils.py| & 数学函数部分 & 实现 Sigmoid 函数和均方误差损失函数 \\
+        \verb|autoencoder.py| & 模型定义部分 & 实现前向传播、反向传播、编码、解码和预测 \\
+        \verb|main.py| & 主程序部分 & 构造数据、训练模型、保存图像和输出结果 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+其中，自编码器类 \verb|AutoEncoder838| 是程序的核心。其 \verb|forward| 函数用于完成前向传播，\verb|train_one_epoch| 函数用于完成一次完整的前向传播、损失计算、反向传播和参数更新。
+
+\section{实验参数设置}
+
+本实验采用的主要超参数如下表所示：
+
+\begin{table}[H]
+    \centering
+    \caption{实验超参数设置}
+    \begin{tabular}{ll}
+        \toprule
+        参数名称 & 参数取值 \\
+        \midrule
+        输入层神经元数 & $8$ \\
+        隐藏层神经元数 & $3$ \\
+        输出层神经元数 & $8$ \\
+        训练轮数 & $50000$ \\
+        学习率 & $10.0$ \\
+        随机种子 & $42$ \\
+        激活函数 & Sigmoid \\
+        损失函数 & 均方误差 \\
+        优化方法 & 批量梯度下降 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+权重初始化采用类似 Xavier 均匀初始化的方法。对于某一层输入维度为 $d_{in}$、输出维度为 $d_{out}$ 的权重矩阵，初始化范围为：
+\begin{equation}
+    \left[-\sqrt{\frac{6}{d_{in}+d_{out}}},\sqrt{\frac{6}{d_{in}+d_{out}}}\right]
+\end{equation}
+
+这种初始化方式有助于避免初始权重过大或过小，从而提升训练稳定性。
+
+\section{实验结果与分析}
+
+程序运行结束后，会输出最终损失值、原始单位矩阵、隐藏层编码矩阵、解码后的输出矩阵以及经过 $0.5$ 阈值二值化后的矩阵。同时，程序会保存训练过程中的损失函数图像。
+
+在本次实验参数设置下，最终损失值约为：
+\begin{equation}
+    L \approx 7.8142 \times 10^{-5}
+\end{equation}
+
+隐藏层编码矩阵示例如下：
+\begin{Verbatim}[fontsize=\small]
+[[0.9934 0.0038 0.9310]
+ [0.0461 0.0097 0.9917]
+ [0.9791 0.9834 0.0044]
+ [0.0031 0.0060 0.0675]
+ [0.0032 0.9849 0.9752]
+ [0.0123 0.9316 0.0063]
+ [0.8483 0.0081 0.0040]
+ [0.9955 0.9963 0.9962]]
+\end{Verbatim}
+
+解码后的输出矩阵示例如下：
+\begin{Verbatim}[fontsize=\small]
+[[0.9917 0.0043 0.0000 0.0000 0.0000 0.0000 0.0038 0.0076]
+ [0.0057 0.9931 0.0000 0.0048 0.0065 0.0000 0.0000 0.0000]
+ [0.0000 0.0000 0.9919 0.0000 0.0000 0.0041 0.0042 0.0073]
+ [0.0000 0.0045 0.0000 0.9919 0.0000 0.0056 0.0062 0.0000]
+ [0.0000 0.0040 0.0000 0.0000 0.9915 0.0038 0.0000 0.0076]
+ [0.0000 0.0000 0.0059 0.0042 0.0066 0.9927 0.0000 0.0000]
+ [0.0066 0.0000 0.0061 0.0041 0.0000 0.0000 0.9922 0.0000]
+ [0.0040 0.0000 0.0040 0.0000 0.0036 0.0000 0.0000 0.9888]]
+\end{Verbatim}
+
+将输出矩阵按照阈值 $0.5$ 进行二值化后，得到：
+\begin{Verbatim}[fontsize=\small]
+[[1 0 0 0 0 0 0 0]
+ [0 1 0 0 0 0 0 0]
+ [0 0 1 0 0 0 0 0]
+ [0 0 0 1 0 0 0 0]
+ [0 0 0 0 1 0 0 0]
+ [0 0 0 0 0 1 0 0]
+ [0 0 0 0 0 0 1 0]
+ [0 0 0 0 0 0 0 1]]
+\end{Verbatim}
+
+由结果可以看出，解码后的矩阵在主对角线位置接近 $1$，在非主对角线位置接近 $0$。经过阈值化处理后，输出矩阵能够恢复为 $8 \times 8$ 单位矩阵。这说明该 $8$-$3$-$8$ 自编码器已经基本学会了对单位矩阵的编码与解码映射。
+
+\section{损失函数曲线}
+
+训练过程中，程序将每一轮 epoch 的损失值保存下来，并绘制为损失函数曲线。随着训练轮数增加，损失函数整体呈下降趋势，说明网络参数通过反向传播和梯度下降不断被优化。
+
+\begin{figure}[H]
+    \centering
+    % 将下面的 loss_curve.png 改成你实际生成的损失函数图片路径。
+    % 例如：figures/loss_curve.png 或 ./loss_curve.png
+    \IfFileExists{loss_curve.png}{
+        \includegraphics[width=0.85\textwidth]{loss_curve.png}
+    }{
+        \fbox{\parbox[c][6cm][c]{0.85\textwidth}{\centering loss_curve.png}}
+    }
+    \caption{训练过程中的损失函数曲线}
+    \label{fig:loss_curve}
+\end{figure}
+
+从图1可以观察训练过程中损失函数的变化情况。若曲线逐渐下降并趋于稳定，说明模型的训练过程是有效的。
+
+\section{结论}
+
+本文使用 Python 手动实现了一个 $8$-$3$-$8$ 结构的自编码器神经网络。实验中没有使用 TensorFlow、PyTorch 等深度学习框架，而是通过 NumPy 完成矩阵运算、前向传播、反向传播和梯度下降更新。模型以 $8 \times 8$ 单位矩阵作为训练数据，通过 $3$ 个隐藏层神经元完成压缩编码，并最终在输出层恢复原始输入。
+
+实验结果表明，经过 $50000$ 轮训练后，网络损失降低到较小水平，解码输出矩阵与原始单位矩阵高度接近。经过阈值化处理后，输出结果可以恢复为标准单位矩阵，说明该神经网络成功实现了对 $8 \times 8$ 单位矩阵的编解码功能。
+
+\end{document}
