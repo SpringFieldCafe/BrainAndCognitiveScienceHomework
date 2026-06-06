@@ -1,51 +1,42 @@
-from math_utils import mse_loss
-import numpy as np
-from math_utils import sigmoid
+from layers import DenseSigmoidLayer
+from losses import mean_squared_error
+from math_utils import sigmoid_derivative_from_output
 
 class AutoEncoder838:
     def __init__(self, input_size, hidden_size, output_size, seed):
-        rng = np.random.default_rng(seed)
-        w1_limit = np.sqrt(6.0 / (input_size + hidden_size))
-        w2_limit = np.sqrt(6.0 / (hidden_size + output_size))
-        self.w1 = rng.uniform(-w1_limit, w1_limit, size=(input_size, hidden_size))
-        self.b1 = np.zeros((1, hidden_size))
-        self.w2 = rng.uniform(-w2_limit, w2_limit, size=(hidden_size, output_size))
-        self.b2 = np.zeros((1, output_size))
+        self.encoder = DenseSigmoidLayer(input_size, hidden_size, seed)
+        self.decoder = DenseSigmoidLayer(hidden_size, output_size, seed + 1)
 
     def forward(self, x):
-        z1 = x @ self.w1 + self.b1
-        h = sigmoid(z1)
-        z2 = h @ self.w2 + self.b2
-        o = sigmoid(z2)
-        return h, o
+        hidden = self.encoder.forward(x)
+        output = self.decoder.forward(hidden)
+        return hidden, output
 
     def train_one_epoch(self, x, y, learning_rate):
         sample_count = x.shape[0]
-        h, o = self.forward(x)
-        loss = mse_loss(o, y)
+        hidden, output = self.forward(x)
+        loss = mean_squared_error(output, y)
 
-        delta2 = (o - y) * o * (1.0 - o)
-        grad_w2 = h.T @ delta2 / sample_count
-        grad_b2 = np.mean(delta2, axis=0, keepdims=True)
+        output_delta = (output - y) * sigmoid_derivative_from_output(output)
+        decoder_weight_gradient = hidden.T @ output_delta / sample_count
+        decoder_bias_gradient = output_delta.mean(axis=0, keepdims=True)
 
-        delta1 = (delta2 @ self.w2.T) * h * (1.0 - h)
-        grad_w1 = x.T @ delta1 / sample_count
-        grad_b1 = np.mean(delta1, axis=0, keepdims=True)
+        hidden_delta = (output_delta @ self.decoder.weights.T) * sigmoid_derivative_from_output(hidden)
+        encoder_weight_gradient = x.T @ hidden_delta / sample_count
+        encoder_bias_gradient = hidden_delta.mean(axis=0, keepdims=True)
 
-        self.w2 -= learning_rate * grad_w2
-        self.b2 -= learning_rate * grad_b2
-        self.w1 -= learning_rate * grad_w1
-        self.b1 -= learning_rate * grad_b1
+        self.decoder.apply_gradients(decoder_weight_gradient, decoder_bias_gradient, learning_rate)
+        self.encoder.apply_gradients(encoder_weight_gradient, encoder_bias_gradient, learning_rate)
 
         return loss
 
     def encode(self, x):
-        h, _ = self.forward(x)
-        return h
+        hidden, _ = self.forward(x)
+        return hidden
 
     def decode(self, hidden_code):
-        return sigmoid(hidden_code @ self.w2 + self.b2)
+        return self.decoder.forward(hidden_code)
 
     def predict(self, x):
-        _, o = self.forward(x)
-        return o
+        _, output = self.forward(x)
+        return output
