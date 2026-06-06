@@ -15,21 +15,14 @@
 \pagestyle{plain}
 \pagenumbering{arabic}
 
-\title{\textbf{脑与认知科学大作业报告}\\神经网络实现编解码}
 
-\author{
-班级：\underline{\makebox[4cm][c]{人工智能2402班}}
-\quad
-学号：\underline{\makebox[4.5cm][c]{202431121013030}}
-\quad
-姓名：\underline{\makebox[3cm][c]{胡弈周}}
-}
+\title{\textbf{脑与认知科学大作业报告}\\神经网络实现编解码}
 
 \date{}
 \begin{document}
 
 \maketitle
-
+\newpage
 \begin{abstract}
 本文基于 Python 语言手动实现了一个 $8$-$3$-$8$ 结构的自编码器神经网络，用于完成 $8 \times 8$ 单位矩阵的编解码任务。网络由输入层、隐藏层和输出层组成，其中输入层和输出层均包含 $8$ 个神经元，隐藏层包含 $3$ 个神经元。程序没有使用 TensorFlow、PyTorch 等深度学习框架，而是使用 NumPy 完成前向传播、误差反向传播和梯度下降参数更新，并使用 Matplotlib 绘制训练过程中的损失函数曲线。实验结果表明，经过训练后，网络能够将 $8 \times 8$ 单位矩阵压缩到 $8 \times 3$ 的隐藏层编码表示，并较好地恢复出原始单位矩阵。
 \end{abstract}
